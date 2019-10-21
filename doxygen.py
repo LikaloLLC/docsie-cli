@@ -17,6 +17,19 @@ def get_login_file():
 def get_conf_file():
     return 'docsie_conf.json'
 
+def get_conf():
+    # reading JSON object
+    try:
+        with open(get_conf_file(), 'r') as jsonFile:
+            return json.load(jsonFile)
+    except:
+        return {}
+
+def write_conf(conf):
+    # writing JSON object
+    with open(get_conf_file(), "w") as jsonFile:
+        json.dump(conf, jsonFile)
+
 # === CLI Functions ===
 
 @click.group(chain=True)
@@ -59,29 +72,34 @@ def apis2():
         #print(i)
         print(counter,i["name"])
 
-
 @apis.command('select')
 def apis3():
     click.echo('Hey Hey Hey')
-    shelfs = requests.get('https://app.docsie.io/cli/shelfs/', 
+    shelfs = requests.get('https://app.docsie.io/cli/shelfs/',
         headers={'Authorization':get_token()})
     counter = 0
     for i in shelfs.json():
         counter +=1
         #print(i)
         print(counter,i["name"])
-    
+
     inp = int(input("Which shelf? "))
     while not (inp > 0 and inp <= counter):
         inp = int(input("the shelf must be in range 1 - " + str(counter) + ": "))
     print(shelfs.json()[inp - 1]["id"])
-    try:
-        with open(get_conf_file(), 'r') as jsonFile:  # writing JSON object
-            conf = json.load(jsonFile)
-    except:
-        conf = {}
+
+    conf = get_conf()
 
     conf["id"] = shelfs.json()[inp - 1]["id"]
 
-    with open(get_conf_file(), "w") as jsonFile:
-        json.dump(conf, jsonFile)
+    write_conf(conf)
+
+
+@apis.command('set-command')
+@click.argument('command', type=click.Choice(['pydoc', 'javadoc'], case_sensitive=False))
+def apis4(command):
+    click.echo(command)
+    conf = get_conf()
+    conf['command'] = command
+    write_conf(conf)
+
