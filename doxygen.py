@@ -10,6 +10,10 @@ def get_token():
         tokens = json.load(jsonFile)
         return tokens["access_token"]
 
+def get_refresh_token():
+     with open(get_login_file(), 'r') as jsonFile:
+        tokens = json.load(jsonFile)
+        return tokens["refresh_token"]
 
 def get_login_file():
     return 'docsie_login.json'
@@ -103,3 +107,9 @@ def apis4(command):
     conf['command'] = command
     write_conf(conf)
 
+@apis.command('refresh')
+def refresh():
+    refreshtokens = requests.post('https://app.docsie.io/cli/refresh/',
+    json={'refresh_token':get_refresh_token()})
+    with open(get_login_file(), 'w') as jsonFile:  # writing JSON object
+        json.dump(refreshtokens.json(), jsonFile)
