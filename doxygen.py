@@ -1,13 +1,25 @@
 import click
+from datetime import datetime, timedelta
+import json
 import os
 import requests
-import json
 
 # === Helper Functions ===
+
+def date_compare(d):
+    return datetime.now() >= d
+
+def date_convert(dstr):
+    datetime_object = datetime.strptime(dstr, '%Y-%m-%dT%H:%M:%S.%fZ')
+    return datetime_object
 
 def get_token():
      with open(get_login_file(), 'r') as jsonFile:
         tokens = json.load(jsonFile)
+        # ...
+        if date_compare(date_convert(tokens["expires"])):
+          refresh()
+          return get_token()
         return tokens["access_token"]
 
 def get_refresh_token():
@@ -33,6 +45,12 @@ def write_conf(conf):
     # writing JSON object
     with open(get_conf_file(), "w") as jsonFile:
         json.dump(conf, jsonFile)
+
+def refresh():
+    refreshtokens = requests.post('https://app.docsie.io/cli/refresh/',
+    json={'refresh_token':get_refresh_token()})
+    with open(get_login_file(), 'w') as jsonFile:  # writing JSON object
+        json.dump(refreshtokens.json(), jsonFile)
 
 # === CLI Functions ===
 
@@ -106,10 +124,3 @@ def apis4(command):
     conf = get_conf()
     conf['command'] = command
     write_conf(conf)
-
-@apis.command('refresh')
-def refresh():
-    refreshtokens = requests.post('https://app.docsie.io/cli/refresh/',
-    json={'refresh_token':get_refresh_token()})
-    with open(get_login_file(), 'w') as jsonFile:  # writing JSON object
-        json.dump(refreshtokens.json(), jsonFile)
