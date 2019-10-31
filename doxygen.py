@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import json
 import os
 import requests
+import subprocess
 
 # === Helper Functions ===
 
@@ -52,6 +53,23 @@ def refresh():
     with open(get_login_file(), 'w') as jsonFile:  # writing JSON object
         json.dump(refreshtokens.json(), jsonFile)
 
+def run_pydoc():
+    conf = get_conf()
+    subprocess.run(["python", "-m", "pydoc", "-w", conf['file']])
+
+def run_javadoc():
+    conf = get_conf()
+    if "dest" not in conf:
+        raise Exception("enter destination on your config")
+    subprocess.run(["javadoc", conf['file'], "-d", conf['dest']])
+
+def run():
+    conf = get_conf()
+    if conf["command"] == "pydoc":
+        run_pydoc()
+    if conf["command"] == "javadoc":
+        run_javadoc()
+
 # === CLI Functions ===
 
 @click.group(chain=True)
@@ -83,7 +101,7 @@ def apis1(verbose,username,password):
 
 
 @apis.command('list')
-def apis2():
+def apis_list():
     click.echo('Bye Bye Bye')
 
     shelfs = requests.get('https://app.docsie.io/cli/shelfs/', 
@@ -94,8 +112,9 @@ def apis2():
         #print(i)
         print(counter,i["name"])
 
+
 @apis.command('select')
-def apis3():
+def apis_select():
     click.echo('Hey Hey Hey')
     shelfs = requests.get('https://app.docsie.io/cli/shelfs/',
         headers={'Authorization':get_token()})
@@ -119,8 +138,24 @@ def apis3():
 
 @apis.command('set-command')
 @click.argument('command', type=click.Choice(['pydoc', 'javadoc'], case_sensitive=False))
-def apis4(command):
+def apis_command(command):
     click.echo(command)
     conf = get_conf()
     conf['command'] = command
     write_conf(conf)
+
+
+@apis.command('set-file')
+@click.argument('file', type=click.Path(exists=True))
+def apis_file(file):
+    if not file.startswith('/') and not file.startswith('./'):
+        file = './' + file
+    click.echo(click.format_filename(file))
+    conf = get_conf()
+    conf['file'] = file
+    write_conf(conf)
+
+
+@apis.command('update')
+def apis_update():
+    run()
