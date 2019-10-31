@@ -1,14 +1,14 @@
 from setuptools import setup
 
 setup(
-    name="mydoxygen",
+    name="docsie",
     version='0.1',
-    py_modules=['doxygen'],
+    py_modules=['docsie'],
     install_requires=[
         'Click',
     ],
     entry_points='''
         [console_scripts]
-        mydoxygen=doxygen:apis
+        docsie=docsie:apis
     ''',
 )
