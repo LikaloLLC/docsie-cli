@@ -14,77 +14,90 @@ def date_convert(dstr):
     datetime_object = datetime.strptime(dstr, '%Y-%m-%dT%H:%M:%S.%fZ')
     return datetime_object
 
-def get_token():
-     with open(get_login_file(), 'r') as jsonFile:
+def get_token(ctx):
+     with open(get_login_file(ctx), 'r') as jsonFile:
         tokens = json.load(jsonFile)
         # ...
         if date_compare(date_convert(tokens["expires"])):
-          refresh()
-          return get_token()
+          refresh(ctx)
+          return get_token(ctx)
         return tokens["access_token"]
 
-def get_refresh_token():
-     with open(get_login_file(), 'r') as jsonFile:
+def get_refresh_token(ctx):
+     with open(get_login_file(ctx), 'r') as jsonFile:
         tokens = json.load(jsonFile)
         return tokens["refresh_token"]
 
-def get_login_file():
+def get_login_file(ctx):
+    if 'login' in ctx.obj:
+        if ctx.obj['login']:
+            return ctx.obj['login']
     return 'docsie_login.json'
 
-def get_conf_file():
+def get_conf_file(ctx):
+    if 'config' in ctx.obj:
+        if ctx.obj['config']:
+            return ctx.obj['config']
     return 'docsie_conf.json'
 
-def get_conf():
+def get_conf(ctx):
     # reading JSON object
     try:
-        with open(get_conf_file(), 'r') as jsonFile:
+        with open(get_conf_file(ctx), 'r') as jsonFile:
             return json.load(jsonFile)
     except:
         return {}
 
-def write_conf(conf):
+def write_conf(ctx, conf):
     # writing JSON object
-    with open(get_conf_file(), "w") as jsonFile:
+    with open(get_conf_file(ctx), "w") as jsonFile:
         json.dump(conf, jsonFile)
 
-def refresh():
+def refresh(ctx):
     refreshtokens = requests.post('https://app.docsie.io/cli/refresh/',
-    json={'refresh_token':get_refresh_token()})
-    with open(get_login_file(), 'w') as jsonFile:  # writing JSON object
+    json={'refresh_token':get_refresh_token(ctx)})
+    with open(get_login_file(ctx), 'w') as jsonFile:  # writing JSON object
         json.dump(refreshtokens.json(), jsonFile)
 
-def run_pydoc():
-    conf = get_conf()
+def run_pydoc(ctx):
+    conf = get_conf(ctx)
     subprocess.run(["python", "-m", "pydoc", "-w", conf['file']])
 
-def run_javadoc():
-    conf = get_conf()
+def run_javadoc(ctx):
+    conf = get_conf(ctx)
     if "dest" not in conf:
         raise Exception("enter destination on your config")
     subprocess.run(["javadoc", conf['file'], "-d", conf['dest']])
 
-def run():
-    conf = get_conf()
+def run(ctx):
+    conf = get_conf(ctx)
     if conf["command"] == "pydoc":
-        run_pydoc()
+        run_pydoc(ctx)
     if conf["command"] == "javadoc":
-        run_javadoc()
+        run_javadoc(ctx)
 
 # === CLI Functions ===
 
 @click.group(chain=True)
+@click.pass_context
+@click.option('--config', type=click.Path(exists=False))
+@click.option('--login', type=click.Path(exists=False))
 # @click.command()
-def apis():
+def apis(ctx, config, login):
     click.echo("Hello World")
+    ctx.ensure_object(dict)
+    ctx.obj['config'] = config
+    ctx.obj['login'] = login
 
 @apis.command('login')
+@click.pass_context
 @click.option('--verbose','-v', count=True, help="Will print verbose messages.")
 @click.option('--username','-u', prompt=True,
               default=lambda: os.environ.get('USER', ''),
               show_default='current user')
 @click.option('--password','-p', prompt=True, hide_input=True,
               confirmation_prompt=False)
-def apis1(verbose,username,password):
+def apis1(ctx,verbose,username,password):
     """This is an example script to learn Click."""
     if verbose:
         click.echo("We are in the verbose mode {0}".format(verbose))
@@ -96,16 +109,17 @@ def apis1(verbose,username,password):
         json={'username': username, 'password': password})
     print(tokens)
     print(tokens.text)
-    with open(get_login_file(), 'w') as jsonFile:  # writing JSON object
+    with open(get_login_file(ctx), 'w') as jsonFile:  # writing JSON object
         json.dump(tokens.json(), jsonFile)
 
 
 @apis.command('list')
-def apis_list():
+@click.pass_context
+def apis_list(ctx):
     click.echo('Bye Bye Bye')
 
     shelfs = requests.get('https://app.docsie.io/cli/shelfs/', 
-        headers={'Authorization':get_token()})
+        headers={'Authorization':get_token(ctx)})
     counter = 0
     for i in shelfs.json():
         counter +=1
@@ -114,10 +128,11 @@ def apis_list():
 
 
 @apis.command('select')
-def apis_select():
+@click.pass_context
+def apis_select(ctx):
     click.echo('Hey Hey Hey')
     shelfs = requests.get('https://app.docsie.io/cli/shelfs/',
-        headers={'Authorization':get_token()})
+        headers={'Authorization':get_token(ctx)})
     counter = 0
     for i in shelfs.json():
         counter +=1
@@ -129,33 +144,36 @@ def apis_select():
         inp = int(input("the shelf must be in range 1 - " + str(counter) + ": "))
     print(shelfs.json()[inp - 1]["id"])
 
-    conf = get_conf()
+    conf = get_conf(ctx)
 
     conf["id"] = shelfs.json()[inp - 1]["id"]
 
-    write_conf(conf)
+    write_conf(ctx, conf)
 
 
 @apis.command('set-command')
+@click.pass_context
 @click.argument('command', type=click.Choice(['pydoc', 'javadoc'], case_sensitive=False))
-def apis_command(command):
+def apis_command(ctx,command):
     click.echo(command)
-    conf = get_conf()
+    conf = get_conf(ctx)
     conf['command'] = command
-    write_conf(conf)
+    write_conf(ctx, conf)
 
 
 @apis.command('set-file')
+@click.pass_context
 @click.argument('file', type=click.Path(exists=True))
-def apis_file(file):
+def apis_file(ctx,file):
     if not file.startswith('/') and not file.startswith('./'):
         file = './' + file
     click.echo(click.format_filename(file))
-    conf = get_conf()
+    conf = get_conf(ctx)
     conf['file'] = file
-    write_conf(conf)
+    write_conf(ctx, conf)
 
 
 @apis.command('update')
-def apis_update():
-    run()
+@click.pass_context
+def apis_update(ctx):
+    run(ctx)
