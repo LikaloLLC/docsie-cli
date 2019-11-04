@@ -61,10 +61,20 @@ def refresh(ctx):
 
 def run_pydoc(ctx):
     conf = get_conf(ctx)
+    if "file" not in conf:
+        raise Exception("File not set")
     subprocess.run(["python", "-m", "pydoc", "-w", conf['file']])
+    f_name = conf['file']
+    if f_name.endswith('.py'):
+        f_name = f_name[:-3]
+    f_name = f_name + '.html'
+    print(f_name)
+    return f_name
 
 def run_javadoc(ctx):
     conf = get_conf(ctx)
+    if "file" not in conf:
+        raise Exception("File not set")
     if "dest" not in conf:
         raise Exception("enter destination on your config")
     subprocess.run(["javadoc", conf['file'], "-d", conf['dest']])
@@ -73,8 +83,10 @@ def run_javadoc(ctx):
 
 def run(ctx):
     conf = get_conf(ctx)
+    if "command" not in conf:
+        raise Exception("Command not set")
     if conf["command"] == "pydoc":
-        run_pydoc(ctx)
+        return run_pydoc(ctx)
     if conf["command"] == "javadoc":
         run_javadoc(ctx)
 
@@ -178,4 +190,10 @@ def apis_file(ctx,file):
 @apis.command('update')
 @click.pass_context
 def apis_update(ctx):
-    run(ctx)
+    f_name = run(ctx)
+    with open(f_name, 'r') as f:
+        data = f.read()
+        print(data)
+        data = requests.post('https://us-central1-docsie-io.cloudfunctions.net/DOCSIE_CONVERT', json={'html': data})
+        print(data)
+        print(data.json())
