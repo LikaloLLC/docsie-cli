@@ -14,6 +14,22 @@ def date_convert(dstr):
     datetime_object = datetime.strptime(dstr, '%Y-%m-%dT%H:%M:%S.%fZ')
     return datetime_object
 
+def get_docid(ctx):
+    conf = get_conf(ctx)
+    return conf['id']
+
+def get_name(ctx):
+    conf = get_conf(ctx)
+    return conf['name']
+
+def get_description(ctx):
+    conf = get_conf(ctx)
+    return conf['description']
+
+def get_tags(ctx):
+    conf = get_conf(ctx)
+    return conf['tags']
+
 def get_token(ctx):
      with open(get_login_file(ctx), 'r') as jsonFile:
         tokens = json.load(jsonFile)
@@ -68,7 +84,6 @@ def run_pydoc(ctx):
     if f_name.endswith('.py'):
         f_name = f_name[:-3]
     f_name = f_name + '.html'
-    print(f_name)
     return f_name
 
 def run_javadoc(ctx):
@@ -88,7 +103,7 @@ def run(ctx):
     if conf["command"] == "pydoc":
         return run_pydoc(ctx)
     if conf["command"] == "javadoc":
-        run_javadoc(ctx)
+        return run_javadoc(ctx)
 
 # === CLI Functions ===
 
@@ -98,31 +113,21 @@ def run(ctx):
 @click.option('--login', type=click.Path(exists=False))
 # @click.command()
 def apis(ctx, config, login):
-    click.echo("Hello World")
     ctx.ensure_object(dict)
     ctx.obj['config'] = config
     ctx.obj['login'] = login
 
 @apis.command('login')
 @click.pass_context
-@click.option('--verbose','-v', count=True, help="Will print verbose messages.")
 @click.option('--username','-u', prompt=True,
               default=lambda: os.environ.get('USER', ''),
               show_default='current user')
 @click.option('--password','-p', prompt=True, hide_input=True,
               confirmation_prompt=False)
-def apis1(ctx,verbose,username,password):
-    """This is an example script to learn Click."""
-    if verbose:
-        click.echo("We are in the verbose mode {0}".format(verbose))
-    click.echo("Hello World")
-    click.echo('We received {0} as password.'.format(password))
-    print("Hello,", username)
-
+def apis1(ctx,username,password):
     tokens = requests.post('https://app.docsie.io/cli/login/', 
         json={'username': username, 'password': password})
-    print(tokens)
-    print(tokens.text)
+
     with open(get_login_file(ctx), 'w') as jsonFile:  # writing JSON object
         json.dump(tokens.json(), jsonFile)
 
@@ -130,37 +135,36 @@ def apis1(ctx,verbose,username,password):
 @apis.command('list')
 @click.pass_context
 def apis_list(ctx):
-    click.echo('Bye Bye Bye')
-
     shelfs = requests.get('https://app.docsie.io/cli/shelfs/', 
         headers={'Authorization':get_token(ctx)})
     counter = 0
     for i in shelfs.json():
         counter +=1
-        #print(i)
         print(counter,i["name"])
 
 
 @apis.command('select')
 @click.pass_context
 def apis_select(ctx):
-    click.echo('Hey Hey Hey')
     shelfs = requests.get('https://app.docsie.io/cli/shelfs/',
         headers={'Authorization':get_token(ctx)})
     counter = 0
-    for i in shelfs.json():
+    shelfs = shelfs.json()
+    for i in shelfs:
         counter +=1
-        #print(i)
         print(counter,i["name"])
 
     inp = int(input("Which shelf? "))
     while not (inp > 0 and inp <= counter):
         inp = int(input("the shelf must be in range 1 - " + str(counter) + ": "))
-    print(shelfs.json()[inp - 1]["id"])
+    print(shelfs[inp - 1]["id"])
 
     conf = get_conf(ctx)
 
-    conf["id"] = shelfs.json()[inp - 1]["id"]
+    conf["id"] = shelfs[inp - 1]["id"]
+    conf["name"] = shelfs[inp - 1]["name"]
+    conf["description"] = shelfs[inp - 1]["description"]
+    conf["tags"] = shelfs[inp - 1]["tags"]
 
     write_conf(ctx, conf)
 
@@ -193,7 +197,11 @@ def apis_update(ctx):
     f_name = run(ctx)
     with open(f_name, 'r') as f:
         data = f.read()
-        print(data)
         data = requests.post('https://us-central1-docsie-io.cloudfunctions.net/DOCSIE_CONVERT', json={'html': data})
-        print(data)
-        print(data.json())
+        doc_id = get_docid(ctx)
+        result = requests.post('https://app.docsie.io/cli/publish/'+ doc_id+'/', json={
+            'doc': data.json(),
+            'name':get_name(ctx),
+            'description': get_description(ctx),
+            'tags': get_tags(ctx)
+        }, headers={'Authorization': get_token(ctx)})
