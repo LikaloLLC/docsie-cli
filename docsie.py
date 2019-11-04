@@ -68,6 +68,8 @@ def run_javadoc(ctx):
     if "dest" not in conf:
         raise Exception("enter destination on your config")
     subprocess.run(["javadoc", conf['file'], "-d", conf['dest']])
+    f_name = conf['file'][:-5] + '.html'
+    return f_name
 
 def run(ctx):
     conf = get_conf(ctx)
